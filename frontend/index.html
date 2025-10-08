@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SmartDocFinder</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="header">
+    <div class="banner-wrapper">
+        <img src="../banners/smartdocfinder_banner_20251006_210252.png"
+             alt="SmartDocFinder Banner"
+             class="banner">
+        <!-- Animated PDF embroidery -->
+        <svg class="pdf-embroidery" viewBox="0 0 200 80">
+            <text x="20" y="60" class="pdf-stitch">PDF</text>
+        </svg>
+    </div>
+</header>
+
+<main class="container">
+    <h1>📄 SmartDocFinder</h1>
+    <p>Upload and analyze your PDF documents with AI.</p>
+
+    <section class="upload-section">
+        <h2>Upload PDF</h2>
+        <form id="upload-form" enctype="multipart/form-data">
+            <input type="file" name="file" id="file-input" accept="application/pdf">
+            <button type="submit">Upload</button>
+        </form>
+        <div id="upload-result"></div>
+    </section>
+
+    <section class="documents-section">
+        <h2>Uploaded Documents</h2>
+        <button id="refresh-btn">🔄 Refresh List</button>
+        <ul id="documents-list"></ul>
+    </section>
+
+    <section class="search-section">
+        <h2>Search Documents</h2>
+        <input type="text" id="search-query" placeholder="Enter keyword...">
+        <button id="search-btn">Search</button>
+        <ul id="search-results"></ul>
+    </section>
+</main>
+
+<script src="script.js"></script>
+</body>
+</html>
