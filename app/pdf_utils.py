@@ -2,34 +2,25 @@ from PyPDF2 import PdfReader
 from io import BytesIO
 from pathlib import Path
 from typing import Union
-import logging
 
-logger = logging.getLogger(__name__)
-
-def extract_text_from_pdf(input_data: Union[bytes, str, Path]) -> str:
+def extract_text_from_pdf(source: Union[bytes, bytearray, str, Path]) -> str:
     """
     Accepts:
-      - bytes (raw file bytes)
-      - path (str or Path) to local PDF file
-    Returns extracted text (concatenation of pages). Robust to common errors.
+      - bytes (file content)
+      - Path or str (file path)
+    Returns extracted text (empty string on error).
     """
-    reader = None
     try:
-        if isinstance(input_data, (bytes, bytearray)):
-            f = BytesIO(input_data)
-            reader = PdfReader(f)
+        if isinstance(source, (bytes, bytearray)):
+            reader = PdfReader(BytesIO(source))
         else:
-            # treat as path
-            path = Path(input_data)
-            with open(path, "rb") as fh:
-                reader = PdfReader(fh)
+            p = Path(source)
+            data = p.read_bytes()
+            reader = PdfReader(BytesIO(data))
+
         text_parts = []
-        for p in reader.pages:
-            page_text = p.extract_text()
-            if page_text:
-                text_parts.append(page_text)
+        for page in reader.pages:
+            text_parts.append(page.extract_text() or "")
         return "\n".join(text_parts)
-    except Exception as e:
-        logger.exception("Failed extracting PDF text: %s", e)
-        # return empty string on failure, but log error
+    except Exception:
         return ""
