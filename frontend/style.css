@@ -22,7 +22,7 @@ body {
 
 .container {
     padding: 20px;
-    max-width: 800px;
+    max-width: 900px;
     margin: auto;
 }
 
@@ -39,10 +39,12 @@ button {
     border-radius: 8px;
     cursor: pointer;
     font-weight: bold;
+    transition: background-color 0.3s, transform 0.1s;
 }
 
 button:hover {
     background-color: #0ea5e9;
+    transform: scale(1.05);
 }
 
 input[type="file"], input[type="text"] {
@@ -63,49 +65,66 @@ ul {
 li {
     background-color: #1e293b;
     margin: 10px 0;
-    padding: 10px;
+    padding: 15px;
     border-radius: 8px;
-}
-/* === Embroidery animation for PDF text === */
-.banner-wrapper {
+    text-align: left;
     position: relative;
-    display: inline-block;
 }
 
-.pdf-embroidery {
+li .delete-btn {
     position: absolute;
-    top: 10%;
-    left: 8%;
-    width: 120px;
-    height: 60px;
-    overflow: visible;
+    right: 15px;
+    top: 15px;
+    background-color: #ef4444;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
 }
 
-.pdf-stitch {
-    fill: none;
-    stroke: #ff1a1a;
-    stroke-width: 3;
-    stroke-dasharray: 300;
-    stroke-dashoffset: 300;
-    font-family: 'Courier New', monospace;
-    font-size: 48px;
-    animation: stitch 3s linear forwards, glow 1.5s ease-in-out infinite alternate;
+li .delete-btn:hover {
+    background-color: #dc2626;
+}
+/* --- Search results styling --- */
+.search-result {
+    background-color: #1e293b;
+    border-left: 4px solid #38bdf8;
+    margin: 12px 0;
+    padding: 15px;
+    border-radius: 10px;
+    text-align: left;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-@keyframes stitch {
-    from {
-        stroke-dashoffset: 300;
-    }
-    to {
-        stroke-dashoffset: 0;
-    }
+.search-result:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
-@keyframes glow {
-    from {
-        filter: drop-shadow(0 0 2px #ff4d4d);
-    }
-    to {
-        filter: drop-shadow(0 0 10px #ff0000);
-    }
+.filename {
+    color: #38bdf8;
+    font-size: 1.2rem;
+    margin-bottom: 6px;
+}
+
+.meta {
+    color: #94a3b8;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+}
+
+.label {
+    color: #facc15; /* złoto dla etykiet */
+    font-weight: bold;
+}
+
+.summary {
+    color: #e2e8f0;
+    margin-bottom: 8px;
+}
+
+.preview {
+    color: #94a3b8;
+    font-style: italic;
 }

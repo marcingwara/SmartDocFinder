@@ -7,15 +7,7 @@
 </head>
 <body>
 <header class="header">
-    <div class="banner-wrapper">
-        <img src="../banners/smartdocfinder_banner_20251006_210252.png"
-             alt="SmartDocFinder Banner"
-             class="banner">
-        <!-- Animated PDF embroidery -->
-        <svg class="pdf-embroidery" viewBox="0 0 200 80">
-            <text x="20" y="60" class="pdf-stitch">PDF</text>
-        </svg>
-    </div>
+    <img src="banners/smartdocfinder_banner_20251006_210252.png" alt="SmartDocFinder Banner" class="banner">
 </header>
 
 <main class="container">
@@ -25,7 +17,7 @@
     <section class="upload-section">
         <h2>Upload PDF</h2>
         <form id="upload-form" enctype="multipart/form-data">
-            <input type="file" name="file" id="file-input" accept="application/pdf">
+            <input type="file" id="file-input" accept="application/pdf" multiple>
             <button type="submit">Upload</button>
         </form>
         <div id="upload-result"></div>
@@ -37,12 +29,20 @@
         <ul id="documents-list"></ul>
     </section>
 
+    <section class="preview-section">
+        <h2>PDF Preview</h2>
+        <iframe id="pdf-preview" width="100%" height="500px" style="border:1px solid #ccc;"></iframe>
+    </section>
+
     <section class="search-section">
         <h2>Search Documents</h2>
         <input type="text" id="search-query" placeholder="Enter keyword...">
-        <button id="search-btn">Search</button>
+        <button id="search-btn" type="button">Search</button>
+        <button id="clear-index-btn" type="button">Clear Elasticsearch Index</button>
+        <button id="reindex-btn" type="button">Reindex All PDFs</button>
         <ul id="search-results"></ul>
     </section>
+
 </main>
 
 <script src="script.js"></script>

@@ -1,5 +1,6 @@
 fastapi
-uvicorn
+uvicorn[standard]
 PyPDF2
 python-multipart
-Pillow
+pillow
+elasticsearch==8.12.1
