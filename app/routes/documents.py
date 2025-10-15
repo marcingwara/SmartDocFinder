@@ -3,11 +3,14 @@ from fastapi.responses import FileResponse
 from pathlib import Path
 import uuid
 import unicodedata
-
+import urllib.parse
 from app.pdf_utils import extract_text_from_pdf
 from app.ai_utils import analyze_pdf
 from app import db
-from app.elasticsearch_utils import index_pdf, search as es_search, delete_from_index, clear_index
+from app.elasticsearch_utils import index_pdf, search as es_search, delete_from_index, clear_index, create_index
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -15,13 +18,28 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 UPLOAD_FOLDER = BASE_DIR / "uploaded_pdfs"
 UPLOAD_FOLDER.mkdir(exist_ok=True)
 
-
 def _safe_filename(name: str) -> str:
-    """Normalize and sanitize filenames to avoid encoding issues."""
-    return Path(unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")).name
+    # Normalize and strip path
+    name = Path(name).name
+    name = unicodedata.normalize("NFKD", name)
+    return name
 
+def _content_disposition_filename_header(filename: str, disposition: str = "inline"):
+    """
+    Provide RFC5987 compatible filename* header for unicode.
+    We'll return a dict for headers to set on FileResponse.
+    """
+    try:
+        ascii_name = filename.encode("latin-1")
+        header = f'{disposition}; filename="{filename}"'
+        return {"Content-Disposition": header}
+    except Exception:
+        # Use filename* UTF-8 fallback
+        quoted = urllib.parse.quote(filename)
+        header = f"{disposition}; filename*=UTF-8''{quoted}"
+        return {"Content-Disposition": header}
 
-# --- Upload single PDF
+# Upload single
 @router.post("/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".pdf"):
@@ -44,40 +62,29 @@ async def upload_pdf(file: UploadFile = File(...)):
 
     return {"filename": filename, "preview": preview, "summary": summary}
 
-
-# --- Upload multiple PDFs
+# Upload multiple
 @router.post("/upload-multiple")
 async def upload_multiple(files: list[UploadFile] = File(...)):
     results = []
     for file in files:
         if not file.filename.lower().endswith(".pdf"):
-            results.append({"filename": file.filename, "status": "❌ Skipped (not a PDF)"})
+            results.append({"filename": file.filename, "status": "skipped - not pdf"})
             continue
-
         filename = _safe_filename(file.filename)
         data = await file.read()
         dest = UPLOAD_FOLDER / filename
-
         if dest.exists():
             filename = f"{Path(filename).stem}_{uuid.uuid4().hex[:6]}{Path(filename).suffix}"
             dest = UPLOAD_FOLDER / filename
-
         dest.write_bytes(data)
         db.add_document(filename, dest)
-
         preview = extract_text_from_pdf(dest)[:500]
         summary = analyze_pdf(dest)
         index_pdf(dest, filename, summary)
-
-        results.append({
-            "filename": filename,
-            "preview": preview,
-            "summary": summary
-        })
+        results.append({"filename": filename, "preview": preview, "summary": summary})
     return {"uploaded": results}
 
-
-# --- List all documents
+# List
 @router.get("/")
 async def list_documents():
     docs = db.list_documents()
@@ -90,134 +97,82 @@ async def list_documents():
         except Exception:
             preview = ""
             summary = ""
-        out.append({
-            "filename": d["filename"],
-            "preview": preview,
-            "summary": summary
-        })
+        out.append({"filename": d["filename"], "preview": preview, "summary": summary})
     return out
 
-
-# --- View PDF in browser (inline)
+# View
 @router.get("/view/{filename}")
 async def view_pdf(filename: str):
     rec = db.get_document(filename)
     if not rec:
         raise HTTPException(status_code=404, detail="File not found")
-
     path = Path(rec["filepath"])
     if not path.exists():
         raise HTTPException(status_code=404, detail="File missing on disk")
+    headers = _content_disposition_filename_header(filename, disposition="inline")
+    return FileResponse(path, media_type="application/pdf", headers=headers)
 
-    safe_filename = unicodedata.normalize("NFKD", filename).encode("ascii", "ignore").decode("ascii")
-
-    return FileResponse(
-        path,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{safe_filename}"'}
-    )
-
-
-# --- Download PDF
+# Download
 @router.get("/download/{filename}")
 async def download_pdf(filename: str):
     rec = db.get_document(filename)
     if not rec:
         raise HTTPException(status_code=404, detail="File not found")
-
     path = Path(rec["filepath"])
     if not path.exists():
         raise HTTPException(status_code=404, detail="File missing on disk")
+    headers = _content_disposition_filename_header(filename, disposition="attachment")
+    return FileResponse(path, media_type="application/pdf", headers=headers)
 
-    safe_filename = unicodedata.normalize("NFKD", filename).encode("ascii", "ignore").decode("ascii")
-
-    return FileResponse(
-        path,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{safe_filename}"'}
-    )
-
-
-# --- Delete PDF
+# Delete
 @router.delete("/file/{filename}")
 async def delete_document(filename: str):
     rec = db.get_document(filename)
     if not rec:
         raise HTTPException(status_code=404, detail="File not found")
-
     path = Path(rec["filepath"])
     if path.exists():
         path.unlink()
-
     db.delete_document(filename)
     delete_from_index(filename)
+    return {"deleted": filename}
 
-    safe_filename = unicodedata.normalize("NFKD", filename).encode("ascii", "ignore").decode("ascii")
-
-    return {"deleted": safe_filename, "message": "✅ File deleted successfully."}
-
-
-# --- Search PDFs (Elasticsearch)
+# Search
 @router.get("/search")
 async def search_documents(query: str):
     if not query:
         raise HTTPException(status_code=400, detail="Query required")
-
-    try:
-        results = es_search(query)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Search failed: {e}")
-
+    results = es_search(query)
     output = []
     for r in results:
-        filename = r.get("filename", "unknown")
-        path = Path(r.get("path", ""))
-        author = r.get("author", "Unknown")
-        pages = r.get("number_of_pages", 0)
-        created = r.get("created_date", "")
-        summary = r.get("summary", "")
-
-        preview = ""
-        if path.exists():
-            try:
-                preview = extract_text_from_pdf(path)[:300]
-            except Exception:
-                preview = ""
-
-        output.append({
-            "filename": filename,
-            "author": author,
-            "pages": pages,
-            "created_date": created,
-            "summary": summary,
-            "preview": preview
-        })
-
+        try:
+            filepath = Path(r.get("path", ""))
+            preview = extract_text_from_pdf(filepath)[:300] if filepath.exists() else ""
+            summary = r.get("summary", "") or (analyze_pdf(filepath) if filepath.exists() else "")
+            output.append({
+                "filename": r.get("filename", "unknown"),
+                "preview": preview,
+                "summary": summary
+            })
+        except Exception:
+            output.append({"filename": r.get("filename", "unknown"), "preview": "", "summary": ""})
     return output
 
-
-# --- Clear Elasticsearch index
+# Clear index
 @router.delete("/clear-index")
 async def clear_elasticsearch_index():
     clear_index()
     return {"message": "✅ Elasticsearch index cleared successfully."}
 
+# Reindex all
 @router.post("/reindex-all")
 async def reindex_all():
-    """
-    Reindex all PDFs in the upload folder into Elasticsearch.
-    """
-    from app.elasticsearch_utils import index_pdf, create_index
-    from app import db
-
     create_index()
     docs = db.list_documents()
     count = 0
-
     for d in docs:
-       path = Path (d["filepath"])
-       if path.exists():
-           index_pdf(path, d["filename"])
-           count += 1
-
+        p = Path(d["filepath"])
+        if p.exists():
+            index_pdf(p, d["filename"])
+            count += 1
     return {"message": f"✅ Reindexed {count} documents in Elasticsearch."}
