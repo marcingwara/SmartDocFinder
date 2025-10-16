@@ -1,154 +1,148 @@
 const API_BASE = "http://127.0.0.1:8000/documents";
 
-// --- Upload PDF (single or multiple) ---
+// ============ Upload single/multi ============
 document.getElementById("upload-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const input = document.getElementById("file-input");
-    if (!input.files.length) return alert("Select PDF file(s)");
+  e.preventDefault();
+  const input = document.getElementById("file-input");
+  if (!input.files.length) return alert("Select PDF file(s)");
 
-    const formData = new FormData();
-    for (const file of input.files) {
-        formData.append("files", file);
-    }
+  // prefer /upload-multiple – akceptuje multi
+  const form = new FormData();
+  for (const f of input.files) form.append("files", f);
 
-    try {
-        const res = await fetch(`${API_BASE}/upload-multiple`, { method: "POST", body: formData });
-        const data = await res.json();
-        alert(`Uploaded: ${data.uploaded.map(f => f.filename).join(", ")}`);
-        input.value = ""; // Clear file input
-        loadDocuments();
-    } catch (err) {
-        console.error(err);
-        alert("Upload failed");
-    }
+  const res = await fetch(`${API_BASE}/upload-multiple`, { method: "POST", body: form });
+  if (!res.ok) {
+    document.getElementById("upload-result").textContent = "❌ Upload failed. Check server logs.";
+    return;
+  }
+  const data = await res.json();
+  document.getElementById("upload-result").textContent = data.message || "✅ Uploaded";
+  input.value = "";
+  await loadDocuments();
+  await refreshAdmin();
 });
 
-// --- Load documents ---
+// ============ Document list ============
 async function loadDocuments() {
-    const list = document.getElementById("documents-list");
-    list.innerHTML = "";
-    try {
-        const res = await fetch(`${API_BASE}/`);
-        const docs = await res.json();
-        docs.forEach(doc => {
-            const li = document.createElement("li");
-            li.innerHTML = `
-                <strong>${doc.filename}</strong>
-                <button onclick="viewPDF('${doc.filename}')">View</button>
-                <button onclick="downloadPDF('${doc.filename}')">Download</button>
-                <button onclick="deletePDF('${doc.filename}')">Delete</button>
-                <div>Preview: ${doc.preview}</div>
-                <div>AI Summary: ${doc.summary}</div>
-            `;
-            list.appendChild(li);
-        });
-    } catch (err) {
-        console.error(err);
-    }
+  const list = document.getElementById("documents-list");
+  list.innerHTML = "";
+  const res = await fetch(`${API_BASE}/`);
+  if (!res.ok) return;
+
+  const docs = await res.json();
+  docs.forEach(doc => {
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <strong>${doc.filename}</strong>
+      <button onclick="viewPDF('${doc.filename}')">View</button>
+      <button onclick="downloadPDF('${doc.filename}')">Download</button>
+      <button onclick="deletePDF('${doc.filename}')">Delete</button>
+    `;
+    list.appendChild(li);
+  });
 }
 loadDocuments();
 
-// --- View PDF ---
-function viewPDF(filename) {
-    const iframe = document.getElementById("pdf-preview");
-    iframe.src = `${API_BASE}/view/${encodeURIComponent(filename)}`;
-}
-
-// --- Download PDF ---
-function downloadPDF(filename) {
-    window.open(`${API_BASE}/download/${encodeURIComponent(filename)}`, "_blank");
-}
-
-// --- Delete PDF ---
-async function deletePDF(filename) {
-    if (!confirm(`Delete ${filename}?`)) return;
-    try {
-        await fetch(`${API_BASE}/file/${encodeURIComponent(filename)}`, { method: "DELETE" });
-        document.getElementById("pdf-preview").src = ""; // Clear preview
-        loadDocuments();
-        // Also remove from search results if exists
-        const results = document.getElementById("search-results").children;
-        for (let li of results) {
-            if (li.querySelector(".filename")?.textContent === filename) {
-                li.remove();
-            }
-        }
-    } catch (err) {
-        console.error(err);
-        alert("Delete failed");
-    }
-}
-
-// --- Refresh button ---
 document.getElementById("refresh-btn").addEventListener("click", loadDocuments);
 
-// --- Search ---
+// ============ View / Download / Delete ============
+function viewPDF(filename) {
+  const iframe = document.getElementById("pdf-preview");
+  iframe.src = `${API_BASE}/view/${encodeURIComponent(filename)}`;
+}
+function downloadPDF(filename) {
+  window.open(`${API_BASE}/download/${encodeURIComponent(filename)}`, "_blank");
+}
+async function deletePDF(filename) {
+  if (!confirm(`Delete ${filename}?`)) return;
+  await fetch(`${API_BASE}/file/${encodeURIComponent(filename)}`, { method: "DELETE" });
+  document.getElementById("pdf-preview").src = "";
+  await loadDocuments();
+  await refreshAdmin();
+}
+
+// ============ Search ============
 document.getElementById("search-btn").addEventListener("click", async () => {
-    const query = document.getElementById("search-query").value.trim();
-    const searchResults = document.getElementById("search-results");
+  const q = document.getElementById("search-query").value.trim();
+  const list = document.getElementById("search-results");
+  list.innerHTML = "";
+  if (!q) return;
 
-    if (!query) return alert("Enter search keyword");
-
-    try {
-        const res = await fetch(`${API_BASE}/search?query=${encodeURIComponent(query)}`);
-        if (!res.ok) throw new Error("Search request failed");
-
-        const results = await res.json();
-
-        // Smoothly replace previous results
-        Array.from(searchResults.children).forEach(child => searchResults.removeChild(child));
-
-        if (results.length === 0) {
-            const li = document.createElement("li");
-            li.textContent = "No results found.";
-            searchResults.appendChild(li);
-            return;
-        }
-
-        results.forEach(r => {
-            const li = document.createElement("li");
-            li.className = "search-result";
-            li.innerHTML = `
-                <h3 class="filename">${r.filename}</h3>
-                <p class="summary">🧠 AI Summary: ${r.summary || "No summary available"}</p>
-                <p class="preview">🔍 Preview: ${r.preview || "No preview text"}</p>
-                <button onclick="viewPDF('${r.filename}')">👁️ View</button>
-                <button onclick="downloadPDF('${r.filename}')">⬇️ Download</button>
-            `;
-            searchResults.appendChild(li);
-        });
-
-        // Scroll to results smoothly
-        searchResults.scrollIntoView({ behavior: "smooth" });
-
-    } catch (err) {
-        console.error(err);
-        searchResults.innerHTML = "<li>❌ Error searching files. Check console.</li>";
-    }
+  const res = await fetch(`${API_BASE}/search?query=${encodeURIComponent(q)}`);
+  if (!res.ok) {
+    list.innerHTML = "<li>❌ Error searching.</li>";
+    return;
+  }
+  const results = await res.json();
+  if (!results.length) {
+    list.innerHTML = "<li>No results found.</li>";
+    return;
+  }
+  results.forEach(r => {
+    const li = document.createElement("li");
+    li.className = "search-result";
+    li.innerHTML = `
+      <h3 class="filename">${r.filename}</h3>
+      <p class="summary">🧠 AI Summary: ${r.summary || "No summary available"}</p>
+      <p class="preview">🔍 Preview: ${r.preview || "—"}</p>
+      <button onclick="viewPDF('${r.filename}')">👁️ View</button>
+      <button onclick="downloadPDF('${r.filename}')">⬇️ Download</button>
+    `;
+    list.appendChild(li);
+  });
 });
 
-// --- Clear Elasticsearch Index ---
+// ============ ES index mgmt ============
 document.getElementById("clear-index-btn").addEventListener("click", async () => {
-    if (!confirm("Are you sure you want to clear the entire Elasticsearch index?")) return;
-    try {
-        const res = await fetch(`${API_BASE}/clear-index`, { method: "DELETE" });
-        const data = await res.json();
-        alert(data.message);
-    } catch (err) {
-        console.error(err);
-        alert("Failed to clear index");
-    }
+  if (!confirm("Clear entire Elasticsearch index?")) return;
+  const res = await fetch(`${API_BASE}/clear-index`, { method: "DELETE" });
+  const data = await res.json();
+  alert(data.message || "Done");
+  await refreshAdmin();
 });
 
-// --- Reindex All PDFs ---
 document.getElementById("reindex-btn").addEventListener("click", async () => {
-    if (!confirm("Reindex all PDFs in Elasticsearch?")) return;
-    try {
-        const res = await fetch(`${API_BASE}/reindex-all`, { method: "POST" });
-        const data = await res.json();
-        alert(data.message);
-    } catch (err) {
-        console.error(err);
-        alert("Reindex failed");
-    }
+  if (!confirm("Reindex all PDFs?")) return;
+  const res = await fetch(`${API_BASE}/reindex-all`, { method: "POST" });
+  const data = await res.json();
+  alert(data.message || "Done");
+  await refreshAdmin();
 });
+
+// ============ Admin Dashboard ============
+async function refreshAdmin() {
+  try {
+    const res = await fetch(`${API_BASE}/admin/health`);
+    if (!res.ok) return;
+    const data = await res.json();
+
+    document.getElementById("app-status").textContent = data.app || "—";
+    document.getElementById("es-status").textContent = data.elasticsearch?.connected ? "Connected" : "Down";
+    document.getElementById("es-index").textContent = data.elasticsearch?.index || "—";
+    document.getElementById("es-docs").textContent = data.elasticsearch?.docs ?? "—";
+    document.getElementById("vertex-status").textContent = data.vertex_ai?.enabled ? "Enabled" : "Disabled";
+
+    // SQLite count
+    const statusRes = await fetch(`${API_BASE}/status`);
+    if (statusRes.ok) {
+      const st = await statusRes.json();
+      document.getElementById("sqlite-docs").textContent = st.local_files ?? "—";
+      const ul = document.getElementById("recent-files");
+      ul.innerHTML = "";
+      // optional: show just names
+      const listRes = await fetch(`${API_BASE}/`);
+      if (listRes.ok) {
+        const files = await listRes.json();
+        files.slice(0, 5).forEach(f => {
+          const li = document.createElement("li");
+          li.textContent = f.filename;
+          ul.appendChild(li);
+        });
+      }
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+document.getElementById("admin-refresh").addEventListener("click", refreshAdmin);
+refreshAdmin();

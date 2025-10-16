@@ -90,17 +90,24 @@ def index_pdf(path, filename, summary=""):
 
 
 def search(query: str):
-    """Search by content, filename, author, or summary"""
+    """Search by content, filename, author, or summary with fuzzy & wildcard logic"""
     if not check_connection():
         print("[WARN] Elasticsearch unavailable – returning empty result.")
         return []
 
     try:
+        # wildcard + fuzzy + multi_match = lepsze dopasowania
         res = es.search(index=ES_INDEX, body={
             "query": {
-                "multi_match": {
-                    "query": query,
-                    "fields": ["filename^3", "author^2", "content", "summary"]
+                "bool": {
+                    "should": [
+                        {"multi_match": {
+                            "query": query,
+                            "fields": ["filename^3", "author^2", "content", "summary"],
+                            "fuzziness": "AUTO"
+                        }},
+                        {"wildcard": {"content": f"*{query.lower()}*"}}
+                    ]
                 }
             },
             "highlight": {
@@ -109,6 +116,7 @@ def search(query: str):
         })
         hits = res.get("hits", {}).get("hits", [])
         return [h["_source"] for h in hits]
+
     except Exception as e:
         print(f"[ERROR] Search error: {e}")
         return []

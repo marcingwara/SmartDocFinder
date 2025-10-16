@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>SmartDocFinder</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 <header class="header">
@@ -14,6 +14,7 @@
     <h1>📄 SmartDocFinder</h1>
     <p>Upload and analyze your PDF documents with AI.</p>
 
+    <!-- Upload -->
     <section class="upload-section">
         <h2>Upload PDF</h2>
         <form id="upload-form" enctype="multipart/form-data">
@@ -23,17 +24,20 @@
         <div id="upload-result"></div>
     </section>
 
+    <!-- Documents -->
     <section class="documents-section">
         <h2>Uploaded Documents</h2>
         <button id="refresh-btn">🔄 Refresh List</button>
         <ul id="documents-list"></ul>
     </section>
 
+    <!-- Preview -->
     <section class="preview-section">
         <h2>PDF Preview</h2>
-        <iframe id="pdf-preview" width="100%" height="500px" style="border:1px solid #ccc;"></iframe>
+        <iframe id="pdf-preview" width="100%" height="500px" style="border:1px solid #334155;"></iframe>
     </section>
 
+    <!-- Search -->
     <section class="search-section">
         <h2>Search Documents</h2>
         <input type="text" id="search-query" placeholder="Enter keyword...">
@@ -43,6 +47,52 @@
         <ul id="search-results"></ul>
     </section>
 
+    <!-- ADMIN DASHBOARD -->
+    <section class="admin-section">
+        <h2>🛠️ Admin Dashboard</h2>
+
+        <div class="admin-controls">
+            <button id="admin-refresh">🔁 Refresh Status</button>
+            <label class="auto-refresh">
+                <input type="checkbox" id="admin-auto"> Auto-refresh (15s)
+            </label>
+        </div>
+
+        <div id="admin-grid" class="admin-grid">
+            <!-- ES connection -->
+            <div class="card" id="card-es">
+                <div class="card-title">Elasticsearch</div>
+                <div class="card-value" id="es-connected">—</div>
+                <div class="card-meta">
+                    <span id="es-index" class="badge">index: —</span>
+                    <span id="es-index-exists" class="badge">exists: —</span>
+                </div>
+            </div>
+
+            <!-- Docs count -->
+            <div class="card" id="card-docs">
+                <div class="card-title">Documents</div>
+                <div class="card-value" id="docs-count">—</div>
+                <div class="card-meta">Indexed PDFs in ES</div>
+            </div>
+
+            <!-- Vertex AI -->
+            <div class="card" id="card-vertex">
+                <div class="card-title">Vertex AI</div>
+                <div class="card-value" id="vertex-enabled">—</div>
+                <div class="card-meta" id="vertex-model">model: —</div>
+            </div>
+
+            <!-- Last updated -->
+            <div class="card" id="card-updated">
+                <div class="card-title">Last update</div>
+                <div class="card-value" id="admin-updated">—</div>
+                <div class="card-meta" id="admin-note">OK</div>
+            </div>
+        </div>
+
+        <div id="admin-error" class="admin-error" style="display:none;"></div>
+    </section>
 </main>
 
 <script src="script.js"></script>
