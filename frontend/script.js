@@ -84,6 +84,7 @@ document.getElementById("search-btn").addEventListener("click", async () => {
     li.innerHTML = `
       <h3 class="filename">${r.filename}</h3>
       <p class="summary">🧠 AI Summary: ${r.summary || "No summary available"}</p>
+      <p class="lang">🌍 Language: ${r.language || "unknown"}</p>
       <p class="preview">🔍 Preview: ${r.preview || "—"}</p>
       <button onclick="viewPDF('${r.filename}')">👁️ View</button>
       <button onclick="downloadPDF('${r.filename}')">⬇️ Download</button>

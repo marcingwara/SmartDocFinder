@@ -5,7 +5,7 @@ import uuid
 import unicodedata
 import urllib.parse
 from app.pdf_utils import extract_text_from_pdf
-from app.ai_utils import analyze_pdf
+from app.ai_utils import analyze_pdf, detect_language
 from app import db
 from app.elasticsearch_utils import index_pdf, search as es_search, delete_from_index, clear_index, create_index
 import logging
@@ -58,10 +58,13 @@ async def upload_pdf(file: UploadFile = File(...)):
 
     preview = extract_text_from_pdf(dest)[:1000]
     summary = analyze_pdf(dest)
+
+# Extract short text for language detection
+    lang_sample = extract_text_from_pdf(dest)[:2000]
+    language = detect_language(lang_sample)
     index_pdf(dest, filename, summary)
 
-    return {"filename": filename, "preview": preview, "summary": summary}
-
+    return {"filename": filename, "preview": preview, "summary": summary, "language": language}
 # Upload multiple
 @router.post("/upload-multiple")
 async def upload_multiple(files: list[UploadFile] = File(...)):
@@ -152,7 +155,8 @@ async def search_documents(query: str):
             output.append({
                 "filename": r.get("filename", "unknown"),
                 "preview": preview,
-                "summary": summary
+                "summary": summary,
+                "language": r.get("language", "unknown")
             })
         except Exception:
             output.append({"filename": r.get("filename", "unknown"), "preview": "", "summary": ""})
