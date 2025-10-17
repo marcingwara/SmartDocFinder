@@ -18,9 +18,29 @@ def check_connection():
 
 
 def create_index():
-    """Create index if not exists"""
+    """Create index if not exists, with language analyzers."""
     if not es.indices.exists(index=ES_INDEX):
         es.indices.create(index=ES_INDEX, body={
+            "settings": {
+                "analysis": {
+                    "analyzer": {
+                        "custom_polish": {
+                            "tokenizer": "standard",
+                            "filter": ["lowercase", "polish_stem"]
+                        },
+                        "custom_english": {
+                            "tokenizer": "standard",
+                            "filter": ["lowercase", "porter_stem"]
+                        }
+                    },
+                    "filter": {
+                        "polish_stem": {
+                            "type": "stemmer",
+                            "language": "light_polish"
+                        }
+                    }
+                }
+            },
             "mappings": {
                 "properties": {
                     "filename": {"type": "keyword"},
@@ -28,13 +48,14 @@ def create_index():
                     "author": {"type": "text"},
                     "number_of_pages": {"type": "integer"},
                     "created_date": {"type": "date"},
-                    "summary": {"type": "text"},
-                    "content": {"type": "text"},
+                    "summary": {"type": "text", "analyzer": "custom_polish"},
+                    "content": {"type": "text", "analyzer": "custom_polish"},
+                    "language": {"type": "keyword"},
                     "upload_date": {"type": "date"}
                 }
             }
         })
-
+        print("[ES] ✅ Created index with custom analyzer")
 
 def extract_metadata(path: str):
     """Extract author, pages and creation date"""
@@ -56,7 +77,7 @@ def extract_metadata(path: str):
         return {"author": "Unknown", "number_of_pages": 0, "created_date": None}
 
 
-def index_pdf(path, filename, summary=""):
+def index_pdf(path, filename, summary="",language="unknown"):
     """Index PDF content and metadata in Elasticsearch"""
     if not check_connection():
         print("[WARN] Elasticsearch not available – skipping index.")
@@ -79,6 +100,7 @@ def index_pdf(path, filename, summary=""):
             "author": metadata["author"],
             "number_of_pages": metadata["number_of_pages"],
             "created_date": metadata["created_date"],
+            "language": str(language),
             "upload_date": datetime.utcnow().isoformat()
         }
 
@@ -90,31 +112,46 @@ def index_pdf(path, filename, summary=""):
 
 
 def search(query: str):
-    """Search by content, filename, author, or summary with fuzzy & wildcard logic"""
+    """Full-text search across all indexed fields (fuzzy + wildcard + match_phrase_prefix)."""
     if not check_connection():
         print("[WARN] Elasticsearch unavailable – returning empty result.")
         return []
 
     try:
-        # wildcard + fuzzy + multi_match = lepsze dopasowania
         res = es.search(index=ES_INDEX, body={
             "query": {
                 "bool": {
                     "should": [
+                        # Dokładne dopasowanie z boostem
                         {"multi_match": {
                             "query": query,
-                            "fields": ["filename^3", "author^2", "content", "summary"],
+                            "fields": ["filename^3", "author^2", "summary^2", "content"],
+                            "type": "best_fields",
                             "fuzziness": "AUTO"
                         }},
+                        # Dopasowanie prefiksowe (frazy zaczynające się od zapytania)
+                        {"match_phrase_prefix": {
+                            "content": {
+                                "query": query,
+                                "slop": 3
+                            }
+                        }},
+                        # Dopasowanie częściowe (wildcard)
                         {"wildcard": {"content": f"*{query.lower()}*"}}
-                    ]
+                    ],
+                    "minimum_should_match": 1
                 }
             },
             "highlight": {
-                "fields": {"content": {}}
+                "fields": {
+                    "content": {},
+                    "summary": {}
+                }
             }
         })
+
         hits = res.get("hits", {}).get("hits", [])
+        print(f"[ES] Found {len(hits)} results for query: {query}")
         return [h["_source"] for h in hits]
 
     except Exception as e:

@@ -3,17 +3,10 @@ from app.pdf_utils import extract_text_from_pdf
 import logging
 import re
 from collections import Counter
-from langdetect import detect
+from langdetect import detect, DetectorFactory
 
 logger = logging.getLogger(__name__)
-
-def detect_language_safe(text: str) -> str:
-    """Bezpieczne wykrywanie języka (fallback na 'pl')."""
-    try:
-        lang = detect(text)
-        return lang if lang else "pl"
-    except Exception:
-        return "pl"
+DetectorFactory.seed = 0  # stabilniejsze wyniki
 
 def analyze_pdf(path_or_bytes) -> str:
     """
@@ -35,7 +28,7 @@ def analyze_pdf(path_or_bytes) -> str:
         text = text[:15000]
 
         # 2️⃣ Detect language
-        lang = detect_language_safe(text)
+        lang = detect_language(text)
         logger.info(f"[AI] Detected language: {lang}")
 
         # 3️⃣ Try Vertex AI summary (prompt zależny od języka)
@@ -86,14 +79,42 @@ def analyze_pdf(path_or_bytes) -> str:
         return "Błąd generowania streszczenia."
 
 # --- Detect document language ---
-from langdetect import detect, DetectorFactory
-DetectorFactory.seed = 0  # stabilny wynik
+
 
 def detect_language(text: str) -> str:
-    """Detect the dominant language of a text fragment."""
+    """Detect dominant language of text, cleaning spacing and diacritics."""
     try:
-        if not text or len(text.strip()) < 20:
+        if not text:
+            print("[LANG DEBUG] Tekst pusty – brak danych do detekcji.")
             return "unknown"
-        return detect(text)
-    except Exception:
-        return "unknown"
+
+        # 🔍 WYDRUKUJMY fragment tekstu, żeby sprawdzić dekodowanie
+        print(f"[LANG DEBUG] Pierwsze 300 znaków: {text[:300]!r}")
+
+        # Czyszczenie tekstu
+        clean = re.sub(r"[\n\r\t]", " ", text)
+        clean = re.sub(r"(?<=\b)([A-Za-zĄąĆćĘęŁłŃńÓóŚśŹźŻż])\s+(?=[A-Za-zĄąĆćĘęŁłŃńÓóŚśŹźŻż]\b)", r"\1", clean)
+        clean = re.sub(r"[^A-Za-zĄąĆćĘęŁłŃńÓóŚśŹźŻż ]", " ", clean)
+        clean = re.sub(r"\s+", " ", clean).strip()
+
+        if len(clean) < 50:
+            print(f"[LANG DEBUG] Za krótki tekst ({len(clean)} znaków) → unknown")
+            return "unknown"
+
+        # Właściwe wykrycie języka
+        lang = detect(clean)
+        print(f"[LANG DEBUG RESULT] {lang}")
+        return lang
+
+    except Exception as e:
+        print(f"[LANG ERROR] {e}")
+
+        # Heurystyka po znakach narodowych
+        if re.search(r"[ĄąĆćĘęŁłŃńÓóŚśŹźŻż]", text):
+            return "pl"
+        elif re.search(r"[ßüöä]", text):
+            return "de"
+        elif re.search(r"[àâçéèêëîïôùûüÿœ]", text):
+            return "fr"
+        else:
+            return "unknown"

@@ -60,12 +60,20 @@ async def upload_pdf(file: UploadFile = File(...)):
     summary = analyze_pdf(dest)
 
 # Extract short text for language detection
+    from app.ai_utils import detect_language
     lang_sample = extract_text_from_pdf(dest)[:2000]
     language = detect_language(lang_sample)
-    index_pdf(dest, filename, summary)
+    print(f"[LANG TEST] detected={language!r}")
 
-    return {"filename": filename, "preview": preview, "summary": summary, "language": language}
+    index_pdf(dest, filename, summary,language)
+
+
+    return {"filename": filename,
+            "preview": preview,
+            "summary": summary,
+            "language": language}
 # Upload multiple
+
 @router.post("/upload-multiple")
 async def upload_multiple(files: list[UploadFile] = File(...)):
     results = []
@@ -97,10 +105,13 @@ async def list_documents():
             filepath = Path(d["filepath"])
             preview = extract_text_from_pdf(filepath)[:300]
             summary = analyze_pdf(filepath)
+            lang_sample = extract_text_from_pdf(filepath)[:2000]
+            language = detect_language(lang_sample)
         except Exception:
             preview = ""
             summary = ""
-        out.append({"filename": d["filename"], "preview": preview, "summary": summary})
+            language = "unknown"
+        out.append({"filename": d["filename"], "preview": preview, "summary": summary, "language": language})
     return out
 
 # View
@@ -180,3 +191,29 @@ async def reindex_all():
             index_pdf(p, d["filename"])
             count += 1
     return {"message": f"✅ Reindexed {count} documents in Elasticsearch."}
+
+@router.get("/admin/health")
+async def admin_health():
+    """Zwraca stan aplikacji, Elasticsearch i Vertex AI."""
+    from app.elasticsearch_utils import check_connection
+    import importlib
+
+    vertex_enabled = False
+    try:
+        import vertexai
+        vertex_enabled = True
+    except Exception:
+        pass
+
+    es_ok = check_connection()
+    return {
+        "app": "running",
+        "elasticsearch": {
+            "connected": es_ok,
+            "index": "pdf_documents" if es_ok else None,
+            "docs": "OK" if es_ok else "unavailable"
+        },
+        "vertex_ai": {
+            "enabled": vertex_enabled
+        }
+    }
