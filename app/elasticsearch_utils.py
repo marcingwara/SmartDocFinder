@@ -7,7 +7,7 @@ from PyPDF2 import PdfReader
 # --- Konfiguracja środowiska ---
 ELASTIC_URL = os.getenv("ELASTIC_URL")
 ELASTIC_API_KEY = os.getenv("ELASTIC_API_KEY")
-ES_INDEX = os.getenv("ELASTIC_INDEX", "earch-wky3")
+ES_INDEX = os.getenv("ELASTIC_INDEX", "search-wky3")
 
 # --- Inicjalizacja klienta ---
 es = None
