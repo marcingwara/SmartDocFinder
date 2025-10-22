@@ -39,7 +39,7 @@ if BANNERS_DIR.exists():
 # ==========================
 # 🚀 Główne endpointy
 # ==========================
-app.include_router(documents_router, prefix="/documents")
+app.include_router(documents_router)
 
 @app.get("/")
 async def root():
