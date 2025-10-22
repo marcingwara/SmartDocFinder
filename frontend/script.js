@@ -3,6 +3,7 @@
 // ==========================
 
 console.log("🚀 SmartDocFinder frontend loaded.");
+// Backend API URL (Cloud Run)
 const API_BASE = "https://smartdocfinder-861730700785.europe-west1.run.app";
 
 // ==========================
