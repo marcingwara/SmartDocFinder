@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+PyPDF2>=3.0.0
+pillow
+elasticsearch>=8.13.0
+google-cloud-aiplatform>=1.30.0   # optional for Vertex AI (install only if you use Vertex)
+requests
+pytesseract
+pdf2image
+scikit-learn
+sentence-transformers
+chardet
+langdetect
+python-multipart

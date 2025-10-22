@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>SmartDocFinder</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+        /* 🔹 Pasek admina u góry strony */
+        .admin-navbar {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          background-color: #1e293b;
+          color: #e2e8f0;
+          padding: 10px 20px;
+          display: flex;
+          align-items: center;
+          justify-content: flex-start;
+          gap: 10px;
+          z-index: 1000;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* 🔹 Przyciski menu */
+        .admin-btn {
+          background: #334155;
+          color: #e2e8f0;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: 600;
+          font-size: 15px;
+          transition: background-color 0.2s;
+        }
+        .admin-btn:hover {
+          background: #475569;
+        }
+
+        /* 🔹 Dropdown */
+        .dropdown {
+          position: absolute;
+          top: 45px;
+          left: 10px;
+          background-color: #1e293b;
+          border: 1px solid #334155;
+          border-radius: 8px;
+          padding: 8px;
+          z-index: 1001;
+          min-width: 200px;
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+        }
+        .dropdown-item {
+          display: block;
+          width: 100%;
+          text-align: left;
+          background: none;
+          border: none;
+          color: #e2e8f0;
+          padding: 8px;
+          cursor: pointer;
+          border-radius: 4px;
+          font-size: 14px;
+        }
+        .dropdown-item:hover {
+          background-color: #334155;
+        }
+
+        /* 🔹 Sekcja z zawartością menu */
+        .admin-content {
+          margin-top: 80px; /* odstęp od stałego menu */
+          border: 1px solid #334155;
+          border-radius: 10px;
+          padding: 20px;
+          background-color: #0f172a;
+          color: #e2e8f0;
+          margin-bottom: 20px;
+        }
+
+        /* 🔹 Modal Ask AI */
+        .modal {
+          position: fixed;
+          top: 0; left: 0;
+          width: 100%; height: 100%;
+          background: rgba(0,0,0,0.6);
+          display: none;
+          justify-content: center;
+          align-items: center;
+          z-index: 2000;
+        }
+        .modal-content {
+          background: #1e293b;
+          color: #e2e8f0;
+          padding: 20px;
+          border-radius: 12px;
+          width: 420px;
+          box-shadow: 0 0 20px rgba(0,0,0,0.4);
+        }
+        .modal-content input {
+          width: 100%;
+          padding: 10px;
+          border-radius: 6px;
+          border: none;
+          background: #0f172a;
+          color: #e2e8f0;
+          margin-top: 8px;
+        }
+        .modal-content button {
+          background: #38bdf8;
+          color: #0f172a;
+          border: none;
+          border-radius: 6px;
+          padding: 8px 14px;
+          margin-top: 8px;
+          cursor: pointer;
+          font-weight: 600;
+        }
+        .modal-content button:hover {
+          background: #7dd3fc;
+        }
+        #ai-answer {
+          background: #0f172a;
+          padding: 10px;
+          border-radius: 6px;
+          margin-top: 10px;
+          font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+<!-- === FIXED ADMIN NAVBAR === -->
+<nav class="admin-navbar">
+    <button id="admin-menu-btn" class="admin-btn">⚙️ Admin ▼</button>
+    <button id="ask-ai-btn" class="admin-btn" style="background:#38bdf8;color:#0f172a;">🤖 Ask AI</button>
+
+    <div id="admin-dropdown" class="dropdown" style="display:none;">
+        <button class="dropdown-item" onclick="showAdminTab('status')">🩺 System Status</button>
+        <button class="dropdown-item" onclick="showAdminTab('folders')">📁 Manage Folders</button>
+    </div>
+</nav>
+
+<!-- miejsce na dynamiczne dane menu -->
+<section id="admin-content" class="admin-content" style="display:none;">
+    <p>💡 Select an option from the admin menu above.</p>
+</section>
+
+<header class="header">
+    <img src="banners/smartdocfinder_banner_20251006_210252.png" alt="SmartDocFinder Banner" class="banner">
+</header>
+
+<main class="container">
+    <h1>📄 SmartDocFinder</h1>
+    <p>Upload and analyze your PDF documents with AI.</p>
+
+    <!-- Upload -->
+    <section class="upload-section">
+        <h2>Upload PDF</h2>
+        <form id="upload-form" enctype="multipart/form-data">
+            <input type="file" id="file-input" accept="application/pdf" multiple>
+            <button type="submit">Upload</button>
+        </form>
+        <div id="upload-result"></div>
+    </section>
+
+    <!-- Documents -->
+    <section class="documents-section">
+        <h2>Uploaded Documents</h2>
+        <button id="refresh-btn">🔄 Refresh List</button>
+        <ul id="documents-list"></ul>
+    </section>
+
+    <!-- Preview -->
+    <section class="preview-section">
+        <h2>PDF Preview</h2>
+        <iframe id="pdf-preview" width="100%" height="500px" style="border:1px solid #334155;"></iframe>
+    </section>
+
+    <!-- Search -->
+    <section class="search-section">
+        <h2>Search Documents</h2>
+        <input type="text" id="search-query" placeholder="Enter keyword...">
+        <button id="search-btn" type="button">Search</button>
+        <button id="clear-index-btn" type="button">Clear Elasticsearch Index</button>
+        <button id="reindex-btn" type="button">Reindex All PDFs</button>
+        <ul id="search-results"></ul>
+    </section>
+
+    <!-- ADMIN DASHBOARD -->
+    <section class="admin-section">
+        <h2>🛠️ Admin Dashboard</h2>
+        <div class="admin-controls">
+            <button id="admin-refresh">🔁 Refresh Status</button>
+            <label class="auto-refresh">
+                <input type="checkbox" id="admin-auto"> Auto-refresh (15s)
+            </label>
+        </div>
+
+        <div id="admin-grid" class="admin-grid">
+            <div class="card" id="card-es">
+                <div class="card-title">Elasticsearch</div>
+                <div class="card-value" id="es-connected">—</div>
+                <div class="card-meta">
+                    <span id="es-index" class="badge">index: —</span>
+                    <span id="es-index-exists" class="badge">exists: —</span>
+                </div>
+            </div>
+
+            <div class="card" id="card-docs">
+                <div class="card-title">Documents</div>
+                <div class="card-value" id="docs-count">—</div>
+                <div class="card-meta">Indexed PDFs in ES</div>
+            </div>
+
+            <div class="card" id="card-vertex">
+                <div class="card-title">Vertex AI</div>
+                <div class="card-value" id="vertex-enabled">—</div>
+                <div class="card-meta" id="vertex-model">model: —</div>
+            </div>
+
+            <div class="card" id="card-updated">
+                <div class="card-title">Last update</div>
+                <div class="card-value" id="admin-updated">—</div>
+                <div class="card-meta" id="admin-note">OK</div>
+            </div>
+        </div>
+
+        <div id="admin-error" class="admin-error" style="display:none;"></div>
+    </section>
+</main>
+
+<!-- 🤖 ASK AI MODAL -->
+<div id="ask-ai-modal" class="modal">
+    <div class="modal-content">
+        <h3>🧠 Ask SmartDocFinder AI</h3>
+        <input id="ai-query" placeholder="Ask your question about PDFs..." />
+        <button id="ai-send-btn">Ask</button>
+        <div id="ai-answer"></div>
+        <button id="ai-close-btn" style="background:#475569;color:#e2e8f0;">Close</button>
+    </div>
+</div>
+
+<script src="script.js"></script>
+<footer style="margin-top:40px; color:#64748b; font-size:0.9em;">
+    © 2025 SmartDocFinder • Powered by AI & FastAPI
+</footer>
+</body>
+</html>
