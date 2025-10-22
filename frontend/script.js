@@ -3,11 +3,7 @@
 // ==========================
 
 console.log("🚀 SmartDocFinder frontend loaded.");
-<<<<<<< HEAD
-const API_BASE = "http://127.0.0.1:8000/documents";
-=======
 const API_BASE = "https://smartdocfinder-861730700785.europe-west1.run.app";
->>>>>>> 28d8ac1 (Fix 1)
 
 // ==========================
 // 📦 FUNCTION: handleUpload
@@ -27,7 +23,7 @@ async function handleUpload(e) {
 
   result.textContent = "⏳ Uploading...";
   try {
-    const res = await fetch(`${API_BASE}/upload-multiple`, { method: "POST", body: form });
+    const res = await fetch(`${API_BASE}/documents/upload-multiple`, { method: "POST", body: form });
 
     if (!res.ok) throw new Error("Upload failed");
     const data = await res.json();
@@ -64,16 +60,12 @@ async function loadDocuments() {
   list.innerHTML = "<li>⏳ Loading documents...</li>";
 
   try {
-    const res = await fetch(`${API_BASE}/`);
+    const res = await fetch(`${API_BASE}/documents/`);
     if (!res.ok) throw new Error(`Failed to load documents (HTTP ${res.status})`);
     const docs = await res.json();
 
     list.innerHTML = "";
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 28d8ac1 (Fix 1)
     docs.forEach((doc) => {
       const li = document.createElement("li");
       li.innerHTML = `
@@ -105,7 +97,7 @@ async function loadDocuments() {
 // ==========================
 async function populateFolderDropdowns() {
   try {
-    const res = await fetch(`${API_BASE}/folders`);
+    const res = await fetch(`${API_BASE}/documents/folders`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const folders = data.folders || [];
@@ -132,7 +124,7 @@ function viewPDF(filename) {
     return;
   }
 
-  iframe.src = `${API_BASE}/view/${encodeURIComponent(filename)}`;
+  iframe.src = `${API_BASE}/documents/view/${encodeURIComponent(filename)}`;
   iframe.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -158,9 +150,9 @@ async function deletePDF(filename, folderName = null) {
   if (!confirm(`Are you sure you want to delete "${filename}"?`)) return;
 
   try {
-    console.log("🌐 DELETE:", `${API_BASE}/file/${encodeURIComponent(filename)}`);
+    console.log("🌐 DELETE:", `${API_BASE}/documents/file/${encodeURIComponent(filename)}`);
 
-    const res = await fetch(`${API_BASE}/file/${encodeURIComponent(filename)}`, {
+    const res = await fetch(`${API_BASE}/documents/file/${encodeURIComponent(filename)}`, {
       method: "DELETE",
     });
 
@@ -209,7 +201,7 @@ async function moveToFolder(filename, folderName) {
   if (!confirm(`Move "${filename}" → "${folderName}"?`)) return;
 
   try {
-    const res = await fetch(`${API_BASE}/move-to-folder`, {
+    const res = await fetch(`${API_BASE}/documents/move-to-folder`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename, folder: folderName }),
@@ -244,7 +236,7 @@ document.getElementById("search-btn").addEventListener("click", async () => {
   btn.classList.add("searching");
 
   try {
-    const res = await fetch(`${API_BASE}/search?query=${encodeURIComponent(q)}`);
+    const res = await fetch(`${API_BASE}/documents/search?query=${encodeURIComponent(q)}`);
     if (!res.ok) {
       list.innerHTML = "<li>❌ Error searching.</li>";
       return;
@@ -293,7 +285,7 @@ async function refreshAdmin() {
   const errBox = document.getElementById("admin-error");
 
   try {
-    const res = await fetch(`${API_BASE}/admin/health`);
+    const res = await fetch(`${API_BASE}/documents/admin/health`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
@@ -381,7 +373,7 @@ async function showAdminTab(tab) {
     // 🩺 SYSTEM STATUS
     // ==================
     if (tab === "status") {
-      const res = await fetch(`${API_BASE}/admin/health`);
+      const res = await fetch(`${API_BASE}/documents/admin/health`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
@@ -418,7 +410,7 @@ async function showAdminTab(tab) {
         if (!confirm("Clear entire Elasticsearch index?")) return;
         const log = document.getElementById("status-log");
         log.textContent = "⏳ Clearing index...";
-        const res = await fetch(`${API_BASE}/clear-index`, { method: "DELETE" });
+        const res = await fetch(`${API_BASE}/documents/clear-index`, { method: "DELETE" });
         const data = await res.json();
         log.textContent = data.message || "✅ Index cleared.";
         await refreshAdmin();
@@ -428,7 +420,7 @@ async function showAdminTab(tab) {
         if (!confirm("Rebuild Elasticsearch index?")) return;
         const log = document.getElementById("status-log");
         log.textContent = "⏳ Reindexing all documents...";
-        const res = await fetch(`${API_BASE}/reindex-all`, { method: "POST" });
+        const res = await fetch(`${API_BASE}/documents/reindex-all`, { method: "POST" });
         const data = await res.json();
         log.textContent = data.message || "✅ Reindex complete.";
         await refreshAdmin();
@@ -440,7 +432,7 @@ async function showAdminTab(tab) {
     // 📁 FOLDERS
     // ==================
     if (tab === "folders") {
-      const res = await fetch(`${API_BASE}/folders`);
+      const res = await fetch(`${API_BASE}/documents/folders`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const folders = data.folders || [];
@@ -518,7 +510,7 @@ async function createFolder() {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/folders`, {
+    const res = await fetch(`${API_BASE}/documents/folders`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
@@ -541,7 +533,7 @@ async function deleteFolder(name) {
   if (!confirm(`Delete folder '${name}'? This cannot be undone.`)) return;
 
   try {
-    const res = await fetch(`${API_BASE}/folders/${encodeURIComponent(name)}`, {
+    const res = await fetch(`${API_BASE}/documents/folders/${encodeURIComponent(name)}`, {
       method: "DELETE",
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -584,7 +576,7 @@ async function openFolder(name) {
   folderItem.insertAdjacentElement("afterend", panel);
 
   try {
-    const res = await fetch(`${API_BASE}/folders/${encodeURIComponent(name)}`);
+    const res = await fetch(`${API_BASE}/documents/folders/${encodeURIComponent(name)}`);
     if (!res.ok) throw new Error("Failed to load folder");
     const data = await res.json();
 
@@ -633,7 +625,7 @@ document.addEventListener("click", (e) => {
 // Fetches all folder names from backend (for dropdowns and moves)
 async function getAllFolders() {
   try {
-    const res = await fetch(`${API_BASE}/folders`);
+    const res = await fetch(`${API_BASE}/documents/folders`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     return Array.isArray(data.folders) ? data.folders : [];
@@ -700,7 +692,7 @@ async function moveFileBetweenFolders(sourceFolder, filename, targetFolder) {
       statusBox.innerHTML = `⏳ Moving <strong>${filename}</strong> to <strong>${targetFolder}</strong>...`;
     }
 
-    const res = await fetch(`${API_BASE}/folders/move`, {
+    const res = await fetch(`${API_BASE}/documents/folders/move`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename, folder: targetFolder }),
@@ -768,7 +760,7 @@ async function aiOrganizeFolders() {
     }
 
     // 1️⃣ Fetch AI suggestions
-    const res = await fetch(`${API_BASE}/ai/suggest-dynamic-folders`);
+    const res = await fetch(`${API_BASE}/documents/ai/suggest-dynamic-folders`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
@@ -853,7 +845,7 @@ async function aiOrganizeFolders() {
 
         try {
           // 1️⃣ Create folder if not exists
-          const resCreate = await fetch(`${API_BASE}/folders`, {
+          const resCreate = await fetch(`${API_BASE}/documents/folders`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name: newName }),
@@ -868,7 +860,7 @@ async function aiOrganizeFolders() {
           let fail = 0;
           for (const file of files) {
             try {
-              const moveRes = await fetch(`${API_BASE}/folders/move`, {
+              const moveRes = await fetch(`${API_BASE}/documents/folders/move`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ filename: file, folder: newName }),
@@ -919,7 +911,7 @@ async function addFileToSuggestedFolder(folderName, filename) {
     }
 
     // ✅ Correct endpoint: /folders/move
-    const res = await fetch(`${API_BASE}/folders/move`, {
+    const res = await fetch(`${API_BASE}/documents/folders/move`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename, folder: folderName }),
@@ -980,7 +972,7 @@ document.addEventListener("DOMContentLoaded", () => {
     answerBox.textContent = "⏳ Thinking...";
 
     try {
-      const res = await fetch(`${API_BASE}/ai/query?text=${encodeURIComponent(question)}`);
+      const res = await fetch(`${API_BASE}/documents/ai/query?text=${encodeURIComponent(question)}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
@@ -1065,7 +1057,7 @@ document.addEventListener("click", async (e) => {
     btn.textContent = "Clearing…";
 
     try {
-      const res = await fetch(`${API_BASE}/clear-index`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}/documents/clear-index`, { method: "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       alert(data.message || "✅ Elasticsearch index cleared successfully.");
@@ -1088,7 +1080,7 @@ document.addEventListener("click", async (e) => {
     btn.textContent = "Reindexing…";
 
     try {
-      const res = await fetch(`${API_BASE}/reindex-all`, { method: "POST" });
+      const res = await fetch(`${API_BASE}/documents/reindex-all`, { method: "POST" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       alert(data.message || "✅ Reindex completed successfully.");
