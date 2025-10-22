@@ -3,7 +3,7 @@
 // ==========================
 
 console.log("🚀 SmartDocFinder frontend loaded.");
-const API_BASE = "http://127.0.0.1:8000/documents";
+const API_BASE = "https://smartdocfinder-861730700785.europe-west1.run.app";
 
 // ==========================
 // 📦 FUNCTION: handleUpload
@@ -65,6 +65,7 @@ async function loadDocuments() {
     const docs = await res.json();
 
     list.innerHTML = "";
+
 
     docs.forEach((doc) => {
       const li = document.createElement("li");
