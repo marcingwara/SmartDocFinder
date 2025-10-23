@@ -18,7 +18,11 @@ app = FastAPI(title="SmartDocFinder API")
 # ==========================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # lub ["https://storage.googleapis.com"]
+    allow_origins=[
+        "https://storage.googleapis.com",  # ✅ Twój frontend hostowany na GCS
+        "https://smartdocfinder-861730700785.europe-west1.run.app",
+        "*"
+        ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

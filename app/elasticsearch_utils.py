@@ -5,21 +5,28 @@ from app.pdf_utils import extract_text_from_pdf
 from PyPDF2 import PdfReader
 
 # --- Konfiguracja środowiska ---
-ELASTIC_URL = os.getenv("ELASTIC_URL")
-ELASTIC_API_KEY = os.getenv("ELASTIC_API_KEY")
+ELASTIC_URL = os.getenv("ELASTIC_URL", "https://46be6faa660744ed95e9a9766b7f5727.us-central1.gcp.cloud.es.io:443")
+ELASTIC_API_KEY = os.getenv("ELASTIC_API_KEY", "ajljSERKb0ItOVM3WDVCLWNZXzc6RkU5LXRuaTlYdGFmY3dkOWN3djI4dw==")
 ES_INDEX = os.getenv("ELASTIC_INDEX", "search-wky3")
 
 # --- Inicjalizacja klienta ---
 es = None
 if ELASTIC_URL and ELASTIC_API_KEY:
     try:
-        es = Elasticsearch(ELASTIC_URL, api_key=ELASTIC_API_KEY)
-        print(f"[ES] ✅ Connected to Elastic Cloud: {ELASTIC_URL}")
+        es = Elasticsearch(
+            ELASTIC_URL,
+            api_key=ELASTIC_API_KEY,
+            verify_certs=True,
+            ssl_show_warn=False,          # 🚀 ważne dla Cloud Run
+            request_timeout=30,           # 🚀 wydłuż timeout
+            retry_on_timeout=True,        # 🚀 automatyczne ponowienia
+        )
+        print(f"[ES] ✅ Connecting to Elastic Cloud: {ELASTIC_URL}")
+        print("[ES] 🔄 Ping:", es.ping())
     except Exception as e:
         print(f"[ES] ❌ Failed to connect: {e}")
 else:
     print("[ES] ⚠️ Missing ELASTIC_URL or ELASTIC_API_KEY. Running in local/offline mode.")
-
 
 # --- Funkcje pomocnicze ---
 def check_connection():
