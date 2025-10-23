@@ -1,12 +1,12 @@
 import os
 from datetime import datetime
-from elasticsearch import Elasticsearch, exceptions
+from elasticsearch import Elasticsearch, exceptions, helpers
 from app.pdf_utils import extract_text_from_pdf
 from PyPDF2 import PdfReader
 
 # --- Konfiguracja środowiska ---
-ELASTIC_URL = os.getenv("ELASTIC_URL", "https://46be6faa660744ed95e9a9766b7f5727.us-central1.gcp.cloud.es.io:443")
-ELASTIC_API_KEY = os.getenv("ELASTIC_API_KEY", "ajljSERKb0ItOVM3WDVCLWNZXzc6RkU5LXRuaTlYdGFmY3dkOWN3djI4dw==")
+ELASTIC_URL = os.getenv("ELASTIC_URL")
+ELASTIC_API_KEY = os.getenv("ELASTIC_API_KEY")
 ES_INDEX = os.getenv("ELASTIC_INDEX", "search-wky3")
 
 # --- Inicjalizacja klienta ---
@@ -16,10 +16,10 @@ if ELASTIC_URL and ELASTIC_API_KEY:
         es = Elasticsearch(
             ELASTIC_URL,
             api_key=ELASTIC_API_KEY,
-            verify_certs=True,
-            ssl_show_warn=False,          # 🚀 ważne dla Cloud Run
-            request_timeout=30,           # 🚀 wydłuż timeout
-            retry_on_timeout=True,        # 🚀 automatyczne ponowienia
+            verify_certs=False,           # ⚠️ wyłączone, bo Elastic Cloud ma certyfikaty GCP
+            ssl_show_warn=False,
+            request_timeout=60,
+            retry_on_timeout=True,
         )
         print(f"[ES] ✅ Connecting to Elastic Cloud: {ELASTIC_URL}")
         print("[ES] 🔄 Ping:", es.ping())
@@ -28,18 +28,23 @@ if ELASTIC_URL and ELASTIC_API_KEY:
 else:
     print("[ES] ⚠️ Missing ELASTIC_URL or ELASTIC_API_KEY. Running in local/offline mode.")
 
-# --- Funkcje pomocnicze ---
+
+# --- Pomocnicze funkcje ---
 def check_connection():
+    """Sprawdź połączenie z Elastic Cloud."""
     if not es:
         return False
     try:
-        return es.ping()
-    except exceptions.ConnectionError:
+        ping = es.ping()
+        print(f"[ES] 🔄 Ping status: {ping}")
+        return ping
+    except Exception as e:
+        print(f"[ES] ⚠️ Ping error: {e}")
         return False
 
 
 def create_index():
-    """Utwórz index, jeśli nie istnieje"""
+    """Utwórz index jeśli nie istnieje."""
     if not es or not check_connection():
         print("[ES] ⚠️ Elasticsearch not available – skipping index creation.")
         return
@@ -47,7 +52,10 @@ def create_index():
     try:
         if not es.indices.exists(index=ES_INDEX):
             es.indices.create(index=ES_INDEX, body={
-                "settings": {"analysis": {"analyzer": {"default": {"type": "standard"}}}},
+                "settings": {
+                    "index": {"number_of_shards": 1},
+                    "analysis": {"analyzer": {"default": {"type": "standard"}}}
+                },
                 "mappings": {
                     "properties": {
                         "filename": {"type": "keyword"},
@@ -63,15 +71,17 @@ def create_index():
                 }
             })
             print(f"[ES] ✅ Created index: {ES_INDEX}")
+        else:
+            print(f"[ES] ℹ️ Index already exists: {ES_INDEX}")
     except Exception as e:
         print(f"[ES] ⚠️ Failed to create index: {e}")
 
 
 def extract_metadata(path: str):
-    """Odczytaj dane z pliku PDF"""
+    """Pobierz dane z pliku PDF."""
     try:
         reader = PdfReader(path)
-        info = reader.metadata
+        info = reader.metadata or {}
         author = info.get("/Author", "Unknown")
         created = info.get("/CreationDate", "")
         if created.startswith("D:"):
@@ -83,12 +93,13 @@ def extract_metadata(path: str):
             "number_of_pages": len(reader.pages),
             "created_date": created
         }
-    except Exception:
+    except Exception as e:
+        print(f"[ES] ⚠️ Metadata extraction failed for {path}: {e}")
         return {"author": "Unknown", "number_of_pages": 0, "created_date": None}
 
 
 def index_pdf(path, filename, summary="", language="unknown"):
-    """Indeksuj dokument PDF"""
+    """Indeksuj dokument PDF."""
     if not es or not check_connection():
         print("[ES] ⚠️ Elasticsearch not available – skipping indexing.")
         return
@@ -120,7 +131,7 @@ def index_pdf(path, filename, summary="", language="unknown"):
 
 
 def search(query: str):
-    """Wyszukiwanie pełnotekstowe"""
+    """Wyszukiwanie pełnotekstowe."""
     if not es or not check_connection():
         print("[ES] ⚠️ Elasticsearch unavailable – returning empty result.")
         return []
@@ -143,16 +154,20 @@ def search(query: str):
 
 
 def delete_from_index(filename: str):
+    """Usuń plik z indeksu."""
     if not es or not check_connection():
         return
     try:
-        es.delete_by_query(index=ES_INDEX, body={"query": {"term": {"filename": {"value": filename}}}})
+        es.delete_by_query(index=ES_INDEX, body={
+            "query": {"term": {"filename": {"value": filename}}}
+        })
         print(f"[ES] 🗑️ Deleted {filename}")
     except Exception as e:
         print(f"[ES] ⚠️ Failed to delete {filename}: {e}")
 
 
 def clear_index():
+    """Wyczyść cały indeks."""
     if not es or not check_connection():
         print("[ES] ⚠️ Elasticsearch not connected – cannot clear index.")
         return
