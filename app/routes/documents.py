@@ -14,7 +14,7 @@ from app.vertex_utils import get_vertex_status
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/documents",tags=["Documents"])
+router = APIRouter(tags=["Documents"])
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 UPLOAD_FOLDER = BASE_DIR / "uploaded_pdfs"
