@@ -81,3 +81,41 @@ def cleanup_missing_files():
     conn.commit()
     conn.close()
     print(f"🧹 Cleanup complete — removed {removed} missing files from database.")
+
+import sqlite3
+from pathlib import Path
+
+DB_PATH = Path("db.sqlite")  # lub "documents.db" jeśli tego używasz
+
+def get_connection():
+    """Połączenie z bazą danych."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def get_all_documents():
+    """Zwraca wszystkie dokumenty w bazie."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT filename FROM documents")
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+    except Exception as e:
+        print(f"[DB] ❌ get_all_documents error: {e}")
+        return []
+
+
+def delete_document(filename: str):
+    """Usuwa dokument po nazwie pliku."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM documents WHERE filename = ?", (filename,))
+        conn.commit()
+        conn.close()
+        print(f"[DB] 🗑️ Deleted {filename} from DB.")
+    except Exception as e:
+        print(f"[DB] ❌ delete_document error: {e}")

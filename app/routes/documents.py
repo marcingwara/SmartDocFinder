@@ -1,16 +1,37 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
-from fastapi.responses import FileResponse
-from pathlib import Path
-import uuid
+# --- Standard library imports ---
+import shutil
+import logging
 import unicodedata
 import urllib.parse
-from app.pdf_utils import extract_text_from_pdf
-from app.ai_utils import analyze_pdf, detect_language
-from app import db
-from app.elasticsearch_utils import index_pdf, search as es_search, delete_from_index, clear_index, create_index
-import logging
+from pathlib import Path
+import os
+from urllib.parse import unquote
 
+# --- Third-party libraries ---
+from fastapi import APIRouter, UploadFile, File, HTTPException, Body
+from fastapi.responses import FileResponse, JSONResponse
+import vertexai
+from vertexai.generative_models import GenerativeModel
+
+# --- Internal project imports ---
+from app import db
+from app.pdf_utils import extract_text_from_pdf
+from app.ai_utils import analyze_pdf, detect_language, ask_ai, suggest_dynamic_folders
+from app.ai_chat import answer_question
 from app.vertex_utils import get_vertex_status
+from app.elasticsearch_utils import (
+    index_pdf,
+    search as es_search,
+    delete_from_index,
+    clear_index,
+    create_index,
+    check_connection,
+    es,
+    ES_INDEX,
+)
+
+print("✅ LOADED DOCUMENTS ROUTER from:", __file__)
+
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +62,7 @@ def _content_disposition_filename_header(filename: str, disposition: str = "inli
         header = f"{disposition}; filename*=UTF-8''{quoted}"
         return {"Content-Disposition": header}
 
-from fastapi.responses import JSONResponse
+
 
 # Upload single
 @router.post("/upload-pdf")
@@ -75,7 +96,7 @@ async def upload_pdf(file: UploadFile = File(...)):
     summary = analyze_pdf(dest)
 
     # Language detection
-    from app.ai_utils import detect_language
+
     lang_sample = extract_text_from_pdf(dest)[:2000]
     language = detect_language(lang_sample)
 
@@ -192,12 +213,12 @@ async def download_pdf(filename: str):
 # Delete
 @router.delete("/file/{filename:path}")
 async def delete_document(filename: str):
+    import os
+    print("🚀 delete_document CALLED - TEST BUILD 1")
     """
     Deletes a PDF file from uploaded_pdfs/ or uploaded_pdfs/folders/.
     Works even if DB record is missing.
     """
-    import shutil
-    from urllib.parse import unquote
 
     try:
         # 🔹 Decode special characters
@@ -268,7 +289,7 @@ async def search_documents(query: str):
 
             # Jeśli language nie ma, spróbuj z metadanych pliku
             if language == "unknown" and filepath.exists():
-                from app.ai_utils import detect_language
+
                 text_sample = extract_text_from_pdf(filepath)[:2000]
                 language = detect_language(text_sample) or "unknown"
 
@@ -314,9 +335,6 @@ async def reindex_all():
 @router.get("/admin/health")
 async def admin_health():
     """Zwraca stan aplikacji, Elasticsearch i Vertex AI (z automatycznym wykrywaniem modelu)."""
-    from app.elasticsearch_utils import check_connection
-    from app.vertex_utils import get_vertex_status
-    from app.db import list_documents
 
     # 🔹 Elasticsearch
     es_ok = check_connection()
@@ -328,8 +346,6 @@ async def admin_health():
     vertex_model = vertex_info.get("model", "—")
     if vertex_info.get("enabled"):
         try:
-            import vertexai
-            from vertexai.generative_models import GenerativeModel
 
             # próba inicjalizacji (nie blokuje, jeśli już zainicjalizowany)
             vertexai.init(project=vertex_info.get("project"), location=vertex_info.get("region"))
@@ -359,8 +375,7 @@ async def admin_health():
 # =============================
 # 📁 FOLDERS MANAGEMENT ENDPOINTS
 # =============================
-from fastapi import Body
-import shutil
+
 
 FOLDERS_ROOT = UPLOAD_FOLDER / "folders"
 FOLDERS_ROOT.mkdir(exist_ok=True)
@@ -389,6 +404,7 @@ async def create_folder(data: dict = Body(...)):
 
 @router.delete("/folders/{name}")
 async def delete_folder(name: str):
+
     """
     Usuwa pusty folder z katalogu upload/folders.
     Jeśli folder nie istnieje lub zawiera pliki — zgłasza błąd.
@@ -433,16 +449,16 @@ async def move_file_to_folder(data: dict = Body(...)):
     if not dest_folder.exists():
         raise HTTPException(status_code=404, detail=f"Destination folder '{folder}' not found")
 
-    import shutil
+
     shutil.move(str(src), str(dest))
 
     # 🔴 BEZ TEGO view/download/delete po przeniesieniu będą się wywalać
-    from app import db
+
     db.add_document(filename, dest)  # <— aktualizacja ścieżki w SQLite
 
     # (opcjonalnie) zaktualizuj ścieżkę w Elasticsearch, jeśli używasz:
     try:
-        from app.elasticsearch_utils import es, ES_INDEX
+
         es.update_by_query(
             index=ES_INDEX,
             body={
@@ -495,11 +511,11 @@ async def move_to_folder(data: dict = Body(...)):
     src.rename(dest)
 
     # 🔹 aktualizuj ścieżkę w SQLite
-    from app import db
+
     db.add_document(filename, dest)
 
     # 🔹 aktualizuj Elasticsearch (aktualizujemy tylko path)
-    from app.elasticsearch_utils import es, ES_INDEX
+
     try:
         es.update_by_query(
             index=ES_INDEX,
@@ -526,8 +542,7 @@ async def ai_suggest_dynamic_folders():
     """
     Analyze indexed documents and suggest smart folder groupings using Vertex AI.
     """
-    from app.elasticsearch_utils import es, ES_INDEX, check_connection
-    from app.ai_utils import suggest_dynamic_folders
+
 
     if not check_connection():
         return {"error": "Elasticsearch not available"}
@@ -557,7 +572,6 @@ async def ai_suggest_dynamic_folders():
         return {"error": str(e), "folders": []}
 
 # --- Q&A over documents ---
-from fastapi import Body
 
 @router.post("/qa")
 async def qa_endpoint(payload: dict = Body(...)):
@@ -569,7 +583,6 @@ async def qa_endpoint(payload: dict = Body(...)):
     if not question:
         raise HTTPException(status_code=400, detail="Question is required")
 
-    from app.ai_chat import answer_question
     result = answer_question(question)
     return result
 
@@ -582,10 +595,55 @@ async def ai_query(text: str):
     Umożliwia użytkownikowi zadanie pytania AI.
     Automatycznie wykrywa język i zwraca odpowiedź w tym języku.
     """
-    from app.ai_utils import ask_ai
+
 
     if not text or len(text.strip()) < 2:
         raise HTTPException(status_code=400, detail="Query too short")
 
     answer = ask_ai(text)
     return {"query": text, "answer": answer}
+
+# ============================================
+# 🧹 ADMIN CLEANUP ENDPOINT (v2 – z logami)
+# ============================================
+
+
+@router.delete("/admin/cleanup", tags=["Admin"])
+def cleanup_missing_files():
+    """
+    Usuwa z bazy i Elasticsearch pliki, które nie istnieją fizycznie.
+    """
+    base_dir = "uploaded_pdfs"
+    removed = []
+    failed = []
+
+    try:
+        all_docs = db.get_all_documents()
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"❌ DB read failed: {str(e)}"}
+        )
+
+    for doc in all_docs:
+        filename = doc.get("filename")
+        if not filename:
+            continue
+
+        file_path = os.path.join(base_dir, filename)
+
+        if not os.path.exists(file_path):
+            try:
+                db.delete_document(filename)
+                delete_from_index(filename)
+                removed.append(filename)
+                print(f"[CLEANUP] Removed: {filename}")
+            except Exception as e:
+                print(f"[CLEANUP] ❌ Failed to remove {filename}: {e}")
+                failed.append({"file": filename, "error": str(e)})
+
+    return {
+        "message": f"🧹 Cleanup finished. Removed {len(removed)} missing files.",
+        "removed": removed,
+        "failed": failed
+    }

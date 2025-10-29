@@ -11,6 +11,9 @@ from app.routes.documents import router as documents_router
 from app import db
 db.cleanup_missing_files()
 
+from dotenv import load_dotenv
+load_dotenv()
+
 app = FastAPI(title="SmartDocFinder API")
 
 # ==========================
