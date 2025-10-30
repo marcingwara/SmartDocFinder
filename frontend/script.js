@@ -137,7 +137,7 @@ function downloadPDF(filename) {
     console.warn("⚠️ No filename provided for download.");
     return;
   }
-  window.open(`${API_BASE}/download/${encodeURIComponent(filename)}`, "_blank");
+  window.open(`${API_BASE}/documents/download/${encodeURIComponent(filename)}`, "_blank");
 }
 // ==========================
 // 🗑️ FUNCTION: deletePDF (universal delete + auto-refresh folder view)
