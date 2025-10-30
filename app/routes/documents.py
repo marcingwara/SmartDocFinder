@@ -192,12 +192,12 @@ async def download_pdf(filename: str):
 # Delete
 @router.delete("/file/{filename:path}")
 async def delete_document(filename: str):
-    import os
-
     """
     Deletes a PDF file from uploaded_pdfs/ or uploaded_pdfs/folders/.
     Works even if DB record is missing.
     """
+    import shutil
+    from urllib.parse import unquote
 
     try:
         # 🔹 Decode special characters
